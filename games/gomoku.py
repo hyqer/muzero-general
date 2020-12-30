@@ -103,7 +103,7 @@ class MuZeroConfig:
         self.use_last_model_value = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
         self.reanalyse_device = "cpu"  # "cpu" / "cuda"
         self.reanalyse_num_gpus = 0  # Number of GPUs to use for the reanalyse, it can be fractional, don't fortget to take the train worker and the selfplay workers into account
-
+        self.reanalyse_on_gpu = False
 
 
         ### Adjust the self play / training ratio to avoid over/underfitting
