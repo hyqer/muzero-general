@@ -10,7 +10,7 @@ import numpy
 import torch
 
 from .abstract_game import AbstractGame
-from gym_anytrading.datasets import FOREX_EURUSD_1H_ASK, STOCKS_GOOGL
+from gym_anytrading.datasets import FOREX_EURUSD_1H_ASK, STOCKS_GOOGL,STOCKS_GOOG_TEST
 
 class MuZeroConfig:
     def __init__(self):
@@ -20,7 +20,7 @@ class MuZeroConfig:
         self.max_num_gpus = None  # Fix the maximum number of GPUs to use. It's usually faster to use a single GPU (set it to 1) if it has enough memory. None will use every GPUs available
 
         ### Game
-        self.observation_shape = (1,10,2) # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
+        self.observation_shape = (1,20,2) # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(2)) # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(1)) # List of players. You should only edit the length
         self.stacked_observations = 0 # Number of previous observations and previous actions to add to the current observation
@@ -34,7 +34,7 @@ class MuZeroConfig:
         self.selfplay_on_gpu = False
         self.max_moves = 300 # Maximum number of moves if game is not finished before
         self.num_simulations = 21 # Number of future moves self-simulated
-        self.discount = 1 # Chronological discount of the reward
+        self.discount = 0.979658#1 # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
 
         # Root prior exploration noise
@@ -71,7 +71,7 @@ class MuZeroConfig:
         ### Training
         self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3], datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
-        self.training_steps = 15000  # Total number of training steps (ie weights update according to a batch)
+        self.training_steps = 150000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 64  # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
@@ -82,7 +82,7 @@ class MuZeroConfig:
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
-        self.lr_init = 0.03  # Initial learning rate
+        self.lr_init = 0.02379 #0.03  # Initial learning rate
         self.lr_decay_rate = 0.75  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 150000
 
@@ -125,9 +125,9 @@ class Game(AbstractGame):
 
     def __init__(self, name=None):
         self.env = gym.make('stocks-v0',
-                df = STOCKS_GOOGL,
-                window_size = 10,
-                frame_bound = (10, 300))
+                df = STOCKS_GOOG_TEST,
+                window_size = 20,
+                frame_bound = (20, len(STOCKS_GOOGL)))
 
     def step(self, action):
         """
@@ -170,7 +170,7 @@ class Game(AbstractGame):
         Display the game observation.
         """
         self.env.render()
-        input("Press enter to take a step ")
+        #input("Press enter to take a step ")
 
     def action_to_string(self, action_number):
         """
