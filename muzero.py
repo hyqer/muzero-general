@@ -5,6 +5,7 @@ import os
 import pickle
 import sys
 import time
+from glob import glob
 
 import nevergrad
 import numpy
@@ -148,13 +149,11 @@ class MuZero:
 
         # Initialize workers
         self.training_worker = trainer.Trainer.options(
-            num_cpus=0,
-            num_gpus=num_gpus_per_worker if self.config.train_on_gpu else 0,
+            num_cpus=0, num_gpus=num_gpus_per_worker if self.config.train_on_gpu else 0,
         ).remote(self.checkpoint, self.config)
 
         self.shared_storage_worker = shared_storage.SharedStorage.remote(
-            self.checkpoint,
-            self.config,
+            self.checkpoint, self.config,
         )
         self.shared_storage_worker.set_info.remote("terminate", False)
 
@@ -173,10 +172,7 @@ class MuZero:
                 num_cpus=0,
                 num_gpus=num_gpus_per_worker if self.config.selfplay_on_gpu else 0,
             ).remote(
-                self.checkpoint,
-                self.Game,
-                self.config,
-                self.config.seed + seed,
+                self.checkpoint, self.Game, self.config, self.config.seed + seed,
             )
             for seed in range(self.config.num_workers)
         ]
@@ -207,8 +203,7 @@ class MuZero:
         """
         # Launch the test worker to get performance metrics
         self.test_worker = self_play.SelfPlay.options(
-            num_cpus=0,
-            num_gpus=num_gpus,
+            num_cpus=0, num_gpus=num_gpus,
         ).remote(
             self.checkpoint,
             self.Game,
@@ -236,8 +231,7 @@ class MuZero:
         )
         # Save model representation
         writer.add_text(
-            "Model summary",
-            self.summary,
+            "Model summary", self.summary,
         )
         # Loop for updating the training performance
         counter = 0
@@ -262,58 +256,48 @@ class MuZero:
             while info["training_step"] < self.config.training_steps:
                 info = ray.get(self.shared_storage_worker.get_info.remote(keys))
                 writer.add_scalar(
-                    "1.Total reward/1.Total reward",
-                    info["total_reward"],
-                    counter,
+                    "1.Total_reward/1.Total_reward", info["total_reward"], counter,
                 )
                 writer.add_scalar(
-                    "1.Total reward/2.Mean value",
-                    info["mean_value"],
-                    counter,
+                    "1.Total_reward/2.Mean_value", info["mean_value"], counter,
                 )
                 writer.add_scalar(
-                    "1.Total reward/3.Episode length",
-                    info["episode_length"],
-                    counter,
+                    "1.Total_reward/3.Episode_length", info["episode_length"], counter,
                 )
                 writer.add_scalar(
-                    "1.Total reward/4.MuZero reward",
-                    info["muzero_reward"],
-                    counter,
+                    "1.Total_reward/4.MuZero_reward", info["muzero_reward"], counter,
                 )
                 writer.add_scalar(
-                    "1.Total reward/5.Opponent reward",
+                    "1.Total_reward/5.Opponent_reward",
                     info["opponent_reward"],
                     counter,
                 )
                 writer.add_scalar(
-                    "2.Workers/1.Self played games",
-                    info["num_played_games"],
-                    counter,
+                    "2.Workers/1.Self_played_games", info["num_played_games"], counter,
                 )
                 writer.add_scalar(
-                    "2.Workers/2.Training steps", info["training_step"], counter
+                    "2.Workers/2.Training_steps", info["training_step"], counter
                 )
                 writer.add_scalar(
-                    "2.Workers/3.Self played steps", info["num_played_steps"], counter
+                    "2.Workers/3.Self_played_steps", info["num_played_steps"], counter
                 )
                 writer.add_scalar(
-                    "2.Workers/4.Reanalysed games",
+                    "2.Workers/4.Reanalysed_games",
                     info["num_reanalysed_games"],
                     counter,
                 )
                 writer.add_scalar(
-                    "2.Workers/5.Training steps per self played step ratio",
+                    "2.Workers/5.Training_steps_per_self_played_step_ratio",
                     info["training_step"] / max(1, info["num_played_steps"]),
                     counter,
                 )
-                writer.add_scalar("2.Workers/6.Learning rate", info["lr"], counter)
+                writer.add_scalar("2.Workers/6.Learning_rate", info["lr"], counter)
                 writer.add_scalar(
-                    "3.Loss/1.Total weighted loss", info["total_loss"], counter
+                    "3.Loss/1.Total_weighted_loss", info["total_loss"], counter
                 )
-                writer.add_scalar("3.Loss/Value loss", info["value_loss"], counter)
-                writer.add_scalar("3.Loss/Reward loss", info["reward_loss"], counter)
-                writer.add_scalar("3.Loss/Policy loss", info["policy_loss"], counter)
+                writer.add_scalar("3.Loss/Value_loss", info["value_loss"], counter)
+                writer.add_scalar("3.Loss/Reward_loss", info["reward_loss"], counter)
+                writer.add_scalar("3.Loss/Policy_loss", info["policy_loss"], counter)
                 print(
                     f'Last test reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}/{self.config.training_steps}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
                     end="\r",
@@ -329,7 +313,12 @@ class MuZero:
             # Persist replay buffer to disk
             print("\n\nPersisting replay buffer games to disk...")
             pickle.dump(
-                self.replay_buffer,
+                {
+                    "buffer": self.replay_buffer,
+                    "num_played_games": self.checkpoint["num_played_games"],
+                    "num_played_steps": self.checkpoint["num_played_steps"],
+                    "num_reanalysed_games": self.checkpoint["num_reanalysed_games"],
+                },
                 open(os.path.join(self.config.results_path, "replay_buffer.pkl"), "wb"),
             )
 
@@ -377,8 +366,7 @@ class MuZero:
         opponent = opponent if opponent else self.config.opponent
         muzero_player = muzero_player if muzero_player else self.config.muzero_player
         self_play_worker = self_play.SelfPlay.options(
-            num_cpus=0,
-            num_gpus=num_gpus,
+            num_cpus=0, num_gpus=num_gpus,
         ).remote(self.checkpoint, self.Game, self.config, numpy.random.randint(10000))
         results = []
         for i in range(num_tests):
@@ -386,11 +374,7 @@ class MuZero:
             results.append(
                 ray.get(
                     self_play_worker.play_game.remote(
-                        0,
-                        0,
-                        render,
-                        opponent,
-                        muzero_player,
+                        0, 0, render, opponent, muzero_player,
                     )
                 )
             )
@@ -432,7 +416,18 @@ class MuZero:
         if replay_buffer_path:
             if os.path.exists(replay_buffer_path):
                 with open(replay_buffer_path, "rb") as f:
-                    self.replay_buffer = pickle.load(f)
+                    replay_buffer_infos = pickle.load(f)
+                self.replay_buffer = replay_buffer_infos["buffer"]
+                self.checkpoint["num_played_steps"] = replay_buffer_infos[
+                    "num_played_steps"
+                ]
+                self.checkpoint["num_played_games"] = replay_buffer_infos[
+                    "num_played_games"
+                ]
+                self.checkpoint["num_reanalysed_games"] = replay_buffer_infos[
+                    "num_reanalysed_games"
+                ]
+
                 print(f"\nInitializing replay buffer with {replay_buffer_path}")
             else:
                 print(
@@ -561,6 +556,41 @@ def hyperparameter_search(
     return recommendation.value
 
 
+def load_model_menu(muzero, game_name):
+    # Configure running options
+    options = ["Specify paths manually"] + sorted(glob(f"results/{game_name}/*/"))
+    options.reverse()
+    print()
+    for i in range(len(options)):
+        print(f"{i}. {options[i]}")
+
+    choice = input("Enter a number to choose a model to load: ")
+    valid_inputs = [str(i) for i in range(len(options))]
+    while choice not in valid_inputs:
+        choice = input("Invalid input, enter a number listed above: ")
+    choice = int(choice)
+
+    if choice == (len(options) - 1):
+        # manual path option
+        checkpoint_path = input(
+            "Enter a path to the model.checkpoint, or ENTER if none: "
+        )
+        while checkpoint_path and not os.path.isfile(checkpoint_path):
+            checkpoint_path = input("Invalid checkpoint path. Try again: ")
+        replay_buffer_path = input(
+            "Enter a path to the replay_buffer.pkl, or ENTER if none: "
+        )
+        while replay_buffer_path and not os.path.isfile(replay_buffer_path):
+            replay_buffer_path = input("Invalid replay buffer path. Try again: ")
+    else:
+        checkpoint_path = f"{options[choice]}model.checkpoint"
+        replay_buffer_path = f"{options[choice]}replay_buffer.pkl"
+
+    muzero.load_model(
+        checkpoint_path=checkpoint_path, replay_buffer_path=replay_buffer_path,
+    )
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         # Train directly with "python muzero.py cartpole"
@@ -612,22 +642,7 @@ if __name__ == "__main__":
             if choice == 0:
                 muzero.train()
             elif choice == 1:
-                checkpoint_path = input(
-                    "Enter a path to the model.checkpoint, or ENTER if none: "
-                )
-                while checkpoint_path and not os.path.isfile(checkpoint_path):
-                    checkpoint_path = input("Invalid checkpoint path. Try again: ")
-                replay_buffer_path = input(
-                    "Enter a path to the replay_buffer.pkl, or ENTER if none: "
-                )
-                while replay_buffer_path and not os.path.isfile(replay_buffer_path):
-                    replay_buffer_path = input(
-                        "Invalid replay buffer path. Try again: "
-                    )
-                muzero.load_model(
-                    checkpoint_path=checkpoint_path,
-                    replay_buffer_path=replay_buffer_path,
-                )
+                load_model_menu(muzero, game_name)
             elif choice == 2:
                 muzero.diagnose_model(30)
             elif choice == 3:
